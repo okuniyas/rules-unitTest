@@ -8,19 +8,19 @@ With JBoss BRMS/Drools project, this tool supports unit testing of rules such as
 + Mapping unit test of rules to JUnit
     - Test class
         - a Test class contains test methods for single ruleflow or single rule package.
-		- after all tests, the Test class produces *Test Coverage of Rules* for the ruleflow or the rule package.
+    	- after all tests, the Test class produces *Test Coverage of Rules* for the ruleflow or the rule package.
     - Test methods
-	    - a Test method do test the entire execution of the ruleflow, OR,
-		- a Test method do test up to specified ruleflow-group in the ruleflow and *skip execution after the ruleflow-group*.
+        - a Test method do test the entire execution of the ruleflow, OR,
+    	- a Test method do test up to specified ruleflow-group in the ruleflow and *skip execution after the ruleflow-group*.
 + Test Coverage of Rules (`RuleCoverageLogger`)
     - Collecting a break down structure of {package} -> {ruleflow} -> {ruleflow-group} -> {rule}
-	- Reporting test coverage by ruleflow (and every ruleflow-group) or by entire package.
-	- Reporting rules which were not covered by the unit tests.
+    - Reporting test coverage by ruleflow (and every ruleflow-group) or by entire package.
+    - Reporting rules which were not covered by the unit tests.
 + Use of CSV files to specify the input data, the expected data and the output dump of the facts. (`CsvTestHelper`)
     - a definition file (*.def) contains column names of CSV file for specific FACT class.
-	    - for example; to test about `FactOne.class`, we need to prepare `FactOne.def` then
-		- prepare `in_FactOne.csv` (an input data) based on the columns defined in the `FactOne.def` and
-		- prepare `ex_FactOne.csv` (an expected data) based on the columns defined in the `FactOne.def`
+        - for example; to test about `FactOne.class`, we need to prepare `FactOne.def` then
+    	- prepare `in_FactOne.csv` (an input data) based on the columns defined in the `FactOne.def` and
+    	- prepare `ex_FactOne.csv` (an expected data) based on the columns defined in the `FactOne.def`
     - then you can load FACTS from the CSV for the input data and for the expected data by the simple API.
 + Fact Watcher (`RuleFactWatchers`)
     - output log about changes of the specific attributes of the specific facts.
@@ -38,11 +38,11 @@ Add a dependency to `rules-unitTest` in the test scope of your target rules proj
 
 ```
     <dependency>
-		<groupId>com.redhat.example</groupId>
-		<artifactId>rules-unitTest</artifactId>
-		<version>3.0.1</version>
-		<scope>test</scope>
-	</dependency>
+    	<groupId>com.redhat.example</groupId>
+    	<artifactId>rules-unitTest</artifactId>
+    	<version>3.0.1</version>
+    	<scope>test</scope>
+    </dependency>
 ```
 
 ### Test Class and Test Coverage
@@ -56,28 +56,28 @@ Add a dependency to `rules-unitTest` in the test scope of your target rules proj
 ```
     @BeforeClass
     public static void init() {
-	    kieBaseName = "your KieBase name";
+        kieBaseName = "your KieBase name";
         ruleFlowName = "your ruleflow name to test in this TestCase class";
-	}
+    }
 
     // Your Session either KieSession or StatelessKieSession
     StatelessKieSession kSession;
 
-	@Before
-	public void initKieSession() {
-	    // Your initialize of the session.
-		kSession = kieBase.newStatelessKieSession();
-		
-		// initializes required listeners for you.
-		initSession(kSession);
-	}
+    @Before
+    public void initKieSession() {
+        // Your initialize of the session.
+    	kSession = kieBase.newStatelessKieSession();
+    	
+    	// initializes required listeners for you.
+    	initSession(kSession);
+    }
 ```
 
 + That's all setting. Add your test methods by using below.
     - KieServices `ks`
-	- KieContainer `kieContainer`
-	- KieCommands `kieCommands`
-	- and your session `kSession` declared in your test class.
+    - KieContainer `kieContainer`
+    - KieCommands `kieCommands`
+    - and your session `kSession` declared in your test class.
 
 `RuleCoverageLogger` reports like below as first group-by-group and then entire ruleflow/package.
 
@@ -105,10 +105,10 @@ For a test scenario, prepare a file to specify the files list in CSV format as b
 
 + `type`
     - `IN` : input data
-	- `EX` : expected results data
+    - `EX` : expected results data
 + `file`
     - csv file which contains the data records
-	- you can include relative path name from this file's folder.
+    - you can include relative path name from this file's folder.
 + `clazz`
     - class name to populate the data
 + `path`
@@ -117,7 +117,7 @@ For a test scenario, prepare a file to specify the files list in CSV format as b
     - if there is a reverse pointer from a child object to its parent object, specify the attribute name.
 + `options` : specify other options by comma `(,)` separated.
     - keyType=... : specify the type of key, if a record is `Map.Entry`.
-	- checkByIndex=true : specify if the actual object order is exactly same as CSV files.
+    - checkByIndex=true : specify if the actual object order is exactly same as CSV files.
         - it does not search record by primary keys with `testPK=tue` attributes. (see below)
 
 
@@ -138,9 +138,9 @@ Above example represents there are three attributes `age, sex and message` and t
     - You can use `"id.key1"` and/or `"foo[0].attr1"` style as `columnName`.
 + `testPK` and `testSkip` are used for expected records.
     - `testPK` is the flag `Y, yes or true` as it's primary key attributes to match an actual fact and an expected record.
-	    - This is defult that the order of the actual and the expect records are *NOT* same.
-		- You can change this by `checkByIndex=true` option. (see above)
-	- `testSkip` is the flag `Y, yes or true` as it's ignored by `RuleFactWatchers` to trace changes.
+        - This is defult that the order of the actual and the expect records are *NOT* same.
+    	- You can change this by `checkByIndex=true` option. (see above)
+    - `testSkip` is the flag `Y, yes or true` as it's ignored by `RuleFactWatchers` to trace changes.
 
 #### Loading and Checking with CSV files
 
@@ -160,7 +160,7 @@ Above example represents there are three attributes `age, sex and message` and t
 
 ```
     CsvTestHelper.assertExpectCSVs(parentList, "testdata/checkByIndex/Files_1.csv",	"parent");
-	CsvTestHelper.assertExpectCSVs(validationResultList, "testdata/checkByIndex/Files_1.csv", "validationResult");
+    CsvTestHelper.assertExpectCSVs(validationResultList, "testdata/checkByIndex/Files_1.csv", "validationResult");
 ```
 
 ### Excel sheet template for test cases and An Excel Macro to generate CSV files from that sheet
@@ -177,7 +177,7 @@ Two patterns of output.
 
 ```
     ** ExampleFact@1957338226#message was NOT changed (null) at rule (Initial_exampleList)
-	* ExampleFact@1957338226#message is Expected (man under 30) But is (null)
+    * ExampleFact@1957338226#message is Expected (man under 30) But is (null)
 ```
 
 + `"ExampleFact@1957338226"` means fact's Class name and the identity hash code.<BR>
@@ -220,10 +220,10 @@ especially If the value are updated as the ruleflow execution progress.
     RuleflowTestHelper.setSkipAfterRuleGroup(kieSession, "ruleflow_group_01");
     ...
     // execute rules
-	...
-	
-	// check the intermediate results
-	CsvTestHelper.assertExpectCSVs(parentList, "testdata/checkByIndex/Files_1.csv",	"parent");
+    ...
+    
+    // check the intermediate results
+    CsvTestHelper.assertExpectCSVs(parentList, "testdata/checkByIndex/Files_1.csv",	"parent");
 ```
 
 ## License
