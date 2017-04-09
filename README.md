@@ -8,10 +8,10 @@ With JBoss BRMS/Drools project, this tool supports unit testing of rules such as
 + Mapping unit test of rules to JUnit
     - Test class
         - a Test class contains test methods for single ruleflow or single rule package.
-    	- after all tests, the Test class produces *Test Coverage of Rules* for the ruleflow or the rule package.
+        - after all tests, the Test class produces *Test Coverage of Rules* for the ruleflow or the rule package.
     - Test methods
         - a Test method do test the entire execution of the ruleflow, OR,
-    	- a Test method do test up to specified ruleflow-group in the ruleflow and *skip execution after the ruleflow-group*.
+        - a Test method do test up to specified ruleflow-group in the ruleflow and *skip execution after the ruleflow-group*.
 + Test Coverage of Rules (`RuleCoverageLogger`)
     - Collecting a break down structure of {package} -> {ruleflow} -> {ruleflow-group} -> {rule}
     - Reporting test coverage by ruleflow (and every ruleflow-group) or by entire package.
@@ -19,8 +19,8 @@ With JBoss BRMS/Drools project, this tool supports unit testing of rules such as
 + Use of CSV files to specify the input data, the expected data and the output dump of the facts. (`CsvTestHelper`)
     - a definition file (*.def) contains column names of CSV file for specific FACT class.
         - for example; to test about `FactOne.class`, we need to prepare `FactOne.def` then
-    	- prepare `in_FactOne.csv` (an input data) based on the columns defined in the `FactOne.def` and
-    	- prepare `ex_FactOne.csv` (an expected data) based on the columns defined in the `FactOne.def`
+        - prepare `in_FactOne.csv` (an input data) based on the columns defined in the `FactOne.def` and
+        - prepare `ex_FactOne.csv` (an expected data) based on the columns defined in the `FactOne.def`
     - then you can load FACTS from the CSV for the input data and for the expected data by the simple API.
 + Fact Watcher (`RuleFactWatchers`)
     - output log about changes of the specific attributes of the specific facts.
@@ -36,12 +36,13 @@ as focused attributes are tracked and easy to trace what happened in the rules.
 
 Add a dependency to `rules-unitTest` in the test scope of your target rules project.
 
+
 ```
     <dependency>
-    	<groupId>com.redhat.example</groupId>
-    	<artifactId>rules-unitTest</artifactId>
-    	<version>3.0.1</version>
-    	<scope>test</scope>
+        <groupId>com.redhat.example</groupId>
+        <artifactId>rules-unitTest</artifactId>
+        <version>3.0.1</version>
+        <scope>test</scope>
     </dependency>
 ```
 
@@ -52,6 +53,7 @@ Add a dependency to `rules-unitTest` in the test scope of your target rules proj
     - the rules which were not executed
 + Set the name of KieBase to `kieBaseName` or you can set it by a property like `"-Drules.unittest.kiebasename=..."`.
 + Set the name of Ruleflow to `ruleFlowName`, if your target rules uses a ruleflow.
+
 
 ```
     @BeforeClass
@@ -66,10 +68,10 @@ Add a dependency to `rules-unitTest` in the test scope of your target rules proj
     @Before
     public void initKieSession() {
         // Your initialize of the session.
-    	kSession = kieBase.newStatelessKieSession();
-    	
-    	// initializes required listeners for you.
-    	initSession(kSession);
+        kSession = kieBase.newStatelessKieSession();
+        
+        // initializes required listeners for you.
+        initSession(kSession);
     }
 ```
 
@@ -94,14 +96,73 @@ This tool has a helper for it, named `CsvTestHelper`.
 
 For a test scenario, prepare a file to specify the files list in CSV format as below.
 
-|type	|file	|clazz	|path	|parentAtr	|options|
-|IN	|in_ParentFact_1.csv	|com.redhat.example.fact.ExampleFactParent	|parent		| | |
-|IN	|in_ChildFact_1.csv	|com.redhat.example.fact.ExampleFactChild	|parent.childList	|parent	| |
-|IN	|in_Map_1.csv	|java.lang.String	|parent.childList.mapAttr	| 	|keyType=java.lang.Integer|
-|EX	|ex_ParentFact_1.csv	|com.redhat.example.fact.ExampleFactParent	|parent	|	| |
-|EX	|ex_ChildFact_1.csv	|com.redhat.example.fact.ExampleFactChild	|parent.childList	|parent	| |
-|EX	|ex_ValidationResult_1.csv	|com.redhat.example.fact.ExampleValidationResult	|validationResult	|	|
-|EX	|ex_Map_1.csv	|java.lang.String	|parent.childList.mapAttr	|	|keyType=java.lang.Integer|
+<table border="1">
+  <tr>
+    <td> type </td>
+    <td> file </td>
+    <td> clazz </td>
+    <td> path </td>
+    <td> parentAtr </td>
+    <td> options </td>
+  </tr>
+  <tr>
+    <td> IN </td>
+    <td> in_ParentFact_1.csv </td>
+    <td> com.redhat.example.fact.ExampleFactParent </td>
+    <td> parent </td>
+    <td/>
+    <td/>
+  </tr>
+  <tr>
+    <td> IN </td>
+    <td> in_ChildFact_1.csv </td>
+    <td> com.redhat.example.fact.ExampleFactChild </td>
+    <td> parent.childList </td>
+    <td> parent </td>
+    <td/>
+  </tr>
+  <tr>
+    <td> IN </td>
+    <td> in_Map_1.csv </td>
+    <td> java.lang.String </td>
+    <td> rent.childList.mapAttr </td>
+    <td/>
+    <td> keyType=java.lang.Integer </td>
+  </tr>
+  <tr>
+    <td> EX </td>
+    <td> ex_ParentFact_1.csv </td>
+    <td> com.redhat.example.fact.ExampleFactParent </td>
+    <td> parent </td>
+    <td/>
+    <td/>
+  </tr>
+  <tr>
+    <td> EX </td>
+    <td> ex_ChildFact_1.csv </td>
+    <td> com.redhat.example.fact.ExampleFactChild </td>
+    <td> parent.childList </td>
+    <td> parent </td>
+    <td/>
+  </tr>
+  <tr>
+    <td> EX </td>
+    <td> ex_ValidationResult_1.csv </td>
+    <td> com.redhat.example.fact.ExampleValidationResult </td>
+    <td> validationResult </td>
+    <td/>
+    <td/>
+  </tr>
+  <tr>
+    <td> EX </td>
+    <td> ex_Map_1.csv </td>
+    <td> java.lang.String </td>
+    <td> parent.childList.mapAttr </td>
+    <td/>
+    <td> keyType=java.lang.Integer </td>
+  </tr>
+</table>
+
 
 + `type`
     - `IN` : input data
@@ -125,10 +186,36 @@ For a test scenario, prepare a file to specify the files list in CSV format as b
 
 For each fact class, you need to prepare the definition file `*.def`
 
-|columnName|option|format|testPK|testSkip|
-|age| | | Y | Y |
-|sex| | | Y | Y |
-|message| | | | |
+<table border="1">
+  <tr>
+    <td> columnName </td>
+    <td> option </td>
+    <td> format </td>
+    <td> testPK </td>
+    <td> testSkip </td>
+  </tr>
+  <tr>
+    <td> age </td>
+    <td/>
+    <td/>
+    <td> Y </td>
+    <td> Y </td>
+  </tr>
+  <tr>
+    <td> sex </td>
+    <td/>
+    <td/>
+    <td> Y </td>
+    <td> Y </td>
+  </tr>
+  <tr>
+    <td> message </td>
+    <td/>
+    <td/>
+    <td/>
+    <td/>
+  </tr>
+</table>
 
 Above example represents there are three attributes `age, sex and message` and there are same name fields in `ExampleFact.class`.
 
@@ -139,7 +226,7 @@ Above example represents there are three attributes `age, sex and message` and t
 + `testPK` and `testSkip` are used for expected records.
     - `testPK` is the flag `Y, yes or true` as it's primary key attributes to match an actual fact and an expected record.
         - This is defult that the order of the actual and the expect records are *NOT* same.
-    	- You can change this by `checkByIndex=true` option. (see above)
+        - You can change this by `checkByIndex=true` option. (see above)
     - `testSkip` is the flag `Y, yes or true` as it's ignored by `RuleFactWatchers` to trace changes.
 
 #### Loading and Checking with CSV files
@@ -147,6 +234,7 @@ Above example represents there are three attributes `age, sex and message` and t
 `CsvTestHelper` contains helper static methods as below.
 
 + Input Data Load - loadInputMap(String fileListCsvPath)
+
 
 ```
     Map<String, List<?>> inputMap =
@@ -158,8 +246,9 @@ Above example represents there are three attributes `age, sex and message` and t
 
 + Check with Expected Results  - assertExpectCSVs(List<?> actuals, String fileListCsvPath, String pathPrefix)
 
+
 ```
-    CsvTestHelper.assertExpectCSVs(parentList, "testdata/checkByIndex/Files_1.csv",	"parent");
+    CsvTestHelper.assertExpectCSVs(parentList, "testdata/checkByIndex/Files_1.csv", "parent");
     CsvTestHelper.assertExpectCSVs(validationResultList, "testdata/checkByIndex/Files_1.csv", "validationResult");
 ```
 
@@ -175,10 +264,12 @@ Fact Watcher helps to trace how expected fields are changed inside the rule engi
 
 Two patterns of output.
 
+
 ```
     ** ExampleFact@1957338226#message was NOT changed (null) at rule (Initial_exampleList)
     * ExampleFact@1957338226#message is Expected (man under 30) But is (null)
 ```
+
 
 + `"ExampleFact@1957338226"` means fact's Class name and the identity hash code.<BR>
   You can trace specific fact by searching with this part in the log file.
@@ -190,9 +281,11 @@ Two patterns of output.
 + `"is Expected (man under 30) But is (null)"` means the expected value of the message is `"man under 30"` but the actual value is `null`.
 
 
+
 ```
     ** ExampleFact@1957338226#message was CHANGED [(null) => (man under 30)] as Expected at rule (Targeting_13)
 ```
+
 
 + `"was CHANGED [(null) => (man under 30)]"` means the value change from `null` to `"man under 30"`
 + `"as Expected"` means the updated value was same as the expected value.
@@ -203,6 +296,7 @@ Two patterns of output.
 `CsvTestHelper` contains helper static methods for Fact Watcher as well as below.
 
 + Create Fact Watchers  - createRuleFactWatchers(String fileListCsvPath)
+
 
 ```
     CsvTestHelper.createRuleFactWatchers("testdata/kadai3/Files_1.csv").setRuntime(kieSession);
@@ -215,6 +309,7 @@ especially If the value are updated as the ruleflow execution progress.
 
 #### Specify the last ruleflow-group to execute
 
+
 ```
     // "ruleflow_group_01" become the last ruleflow-group to execute.
     RuleflowTestHelper.setSkipAfterRuleGroup(kieSession, "ruleflow_group_01");
@@ -223,7 +318,7 @@ especially If the value are updated as the ruleflow execution progress.
     ...
     
     // check the intermediate results
-    CsvTestHelper.assertExpectCSVs(parentList, "testdata/checkByIndex/Files_1.csv",	"parent");
+    CsvTestHelper.assertExpectCSVs(parentList, "testdata/checkByIndex/Files_1.csv", "parent");
 ```
 
 ## License
