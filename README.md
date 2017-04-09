@@ -40,7 +40,7 @@ Add a dependency to `rules-unitTest` in the test scope of your target rules proj
     <dependency>
 		<groupId>com.redhat.example</groupId>
 		<artifactId>rules-unitTest</artifactId>
-		<version>3.0.0</version>
+		<version>3.0.1</version>
 		<scope>test</scope>
 	</dependency>
 ```
