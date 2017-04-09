@@ -1,0 +1,55 @@
+package com.redhat.example;
+
+/**
+ * 入力Mapから、"ExampleFactParent" のFACTをインサートする
+ */
+rule "初期化ルール_ExampleFactParent"
+	salience 10010
+    when
+        Map($list: get("ExampleFactParent") != null);
+    then
+		for (ExampleFactParent $f : (List)$list) {
+			insert($f);
+		}
+end
+
+/**
+ * 入力Mapから、"ExampleFactChild" のFACTをインサートする
+ */
+/*
+rule "初期化ルール_ExampleFactChild"
+	salience 10000
+    when
+        Map($list: get("ExampleFactChild") != null);
+    then
+		for (ExampleFactChild $f : (List)$list) {
+			insert($f);
+		}
+end
+*/
+
+/**
+ * 入力Mapに、"ExampleValidationResult" 出力用のList追加する
+ */
+rule "初期化ルール_ExampleValidationResult"
+	salience 10000
+    when
+        $parameterMap: Map(get("ExampleValidationResult") == null);
+    then
+    	$list = new LinkedList();
+        $parameterMap.put("ExampleValidationResult", $list);
+end
+
+/**
+ * ExampleValidationResult　を出力用のListに入れる
+ */
+rule "後処理ルール_ExampleValidationResult"
+	salience -10000
+    when
+        $parameterMap: Map();
+        $out: ExampleValidationResult();
+    then
+    	$list = (LinkedList)$parameterMap.get("ExampleValidationResult");
+        $list.add($out);
+        retract($out);
+end

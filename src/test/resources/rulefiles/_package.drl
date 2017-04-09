@@ -1,0 +1,11 @@
+package com.redhat.example;
+
+import java.util.*;
+import com.redhat.example.common.*;
+import com.redhat.example.fact.*;
+import com.redhat.example.entity.*;
+import org.slf4j.Logger;
+
+global Logger logger;
+
+dialect "mvel"

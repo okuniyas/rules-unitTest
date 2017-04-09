@@ -1,0 +1,2 @@
+clazz,id,attribute,status,message
+com.redhat.example.fact.ExampleFactChild,p2c2,attrBigDecimal,チェック済,ゼロ値

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender" >
+    <encoder>
+      <pattern>%d{HH:mm:ss,SSS} %-5p [%c] \(%t\) %m%n</pattern>
+    </encoder>
+  </appender>
+  
+  <!-- Rules Unit Test Tool -->
+  <logger name="com.redhat.example.rules.unittest" level="debug" />
+
+  <!-- Drools -->
+  <logger name="org.kie" level="debug" />
+  <logger name="org.drools" level="debug" />
+
+  <!-- Dozer -->
+  <logger name="org.dozer" level="warn" />
+
+  <root level="info">
+    <appender-ref ref="CONSOLE" />
+  </root>
+</configuration>

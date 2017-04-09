@@ -1,0 +1,7 @@
+type,file,clazz,path,parentAtr,options
+IN,in_ParentFact_1.csv,com.redhat.example.fact.ExampleFactParent,parent,,
+IN,in_ChildFact_1.csv,com.redhat.example.fact.ExampleFactChild,parent.childList,parent,
+IN,in_SonFact_1.csv,com.redhat.example.fact.ExampleFactSon,parent.childList.sonList,,
+EX,ex_ParentFact_1.csv,com.redhat.example.fact.ExampleFactParent,parent,,
+EX,ex_ChildFact_1.csv,com.redhat.example.fact.ExampleFactChild,parent.childList,parent,
+EX,ex_SonFact_1.csv,com.redhat.example.fact.ExampleFactSon,parent.childList.sonList,,

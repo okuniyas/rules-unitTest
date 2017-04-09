@@ -1,0 +1,4 @@
+columnName,option,format,testPK,testSkip
+parent#,,,,
+id,,,Y,Y
+name,,,,Y

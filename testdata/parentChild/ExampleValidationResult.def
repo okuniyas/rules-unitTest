@@ -1,0 +1,6 @@
+columnName,option,format,testPK,testSkip
+clazz,,,Y,Y
+id,,,Y,Y
+attribute,,,Y,Y
+status,,,,
+message,,,,

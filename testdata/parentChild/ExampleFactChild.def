@@ -1,0 +1,5 @@
+columnName,option,format,testPK,testSkip
+id,,,Y,Y
+name,,,,Y
+attrBigDecimal,,,,
+attrBigDecimalPlusOne,,,,
