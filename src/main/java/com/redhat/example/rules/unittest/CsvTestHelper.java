@@ -184,18 +184,22 @@ public class CsvTestHelper {
 	 * @return list of column definitions.
 	 */
 	private static List<CsvColumnDef> readColumnDef(String fileName, String className) {
-		File path = new File(fileName);
 		String[] fileMappng = { "columnName", "option", "format", "testPK", "testSkip" };
 		CellProcessor[] processors = new CellProcessor[] { new NotNull(), new Optional(), new Optional(), new Optional(), new Optional() };
 		List<CsvColumnDef> ret = null;
 		try {
-			ret = loadCsv(new File(path.getParentFile(), className + DEFINITION_FILE_EXT).getCanonicalPath(),
-					CsvColumnDef.class, fileMappng, false, processors);
+			String def_file = getDefFile(fileName, className).getCanonicalPath();
+			ret = loadCsv(def_file, CsvColumnDef.class, fileMappng, false, processors);
 		} catch (IOException e) {
 			e.printStackTrace();
 			fail("fail at access: " + className + DEFINITION_FILE_EXT);
 		}
 		return ret;
+	}
+
+	private static File getDefFile(String fileName, String className) throws IOException {
+		File path = new File(fileName);
+		return new File(path.getParentFile(), className + DEFINITION_FILE_EXT);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -233,6 +237,20 @@ public class CsvTestHelper {
 			for (Map<String, Object> map : readCsvIntoMaps(fileName, true)) {
 				String strV = (String)map.get(RuleFactWatcher.Constants.valueAttributeStr);
 				resultList.add((T) strV);
+			}
+			return resultList;
+		} else if (clazz == Object.class) {
+			for (Map<String, Object> map : readCsvIntoMaps(fileName, true)) {
+				String strV = (String)map.get(RuleFactWatcher.Constants.valueAttributeStr);
+				String typeV = (String)map.get(RuleFactWatcher.Constants.typeAttributeStr);
+				Class<?> clazzActual = null;
+				try {
+					clazzActual = (typeV != null) ? Class.forName(typeV) : null;
+				} catch (ClassNotFoundException e) {
+					e.printStackTrace();
+				}
+				Object obj = getImmutableObject(clazzActual, strV);
+				resultList.add((T) obj);
 			}
 			return resultList;
 		}
@@ -878,6 +896,10 @@ public class CsvTestHelper {
 						
 		List<CsvColumnDef> columnDefs = null;
 		try {
+			File defFile = getDefFile(filename, clazz.getSimpleName());
+			if (! defFile.exists()) {
+				clazz = Object.class;
+			}
 			columnDefs = readColumnDef(filename, clazz.getSimpleName());
 		} catch (Exception e1) {
 			e1.printStackTrace();

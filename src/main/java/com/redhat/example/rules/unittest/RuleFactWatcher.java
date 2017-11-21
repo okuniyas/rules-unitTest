@@ -244,6 +244,7 @@ public class RuleFactWatcher {
 		for (Map.Entry<String, Object> entry : expect.map.entrySet()) {
 			// filter out meta attributes
 			if (!Constants.parentRowKey.equals(entry.getKey()) &&
+					!Constants.typeAttributeStr.equals(entry.getKey()) &&
 					!testSkipMap.get(entry.getKey())) {
 				String key = entry.getKey();
 				Object expectedValueString = entry.getValue();
@@ -433,7 +434,8 @@ public class RuleFactWatcher {
 		if (clazz != null) {
 			if (clazz.equals(String.class) ||
 					Number.class.isAssignableFrom(clazz) ||
-					Date.class.isAssignableFrom(clazz)) {
+					Date.class.isAssignableFrom(clazz) ||
+					clazz == Object.class) {
 				return true;
 			}
 		}
@@ -529,5 +531,9 @@ public class RuleFactWatcher {
 		 * key attribute label for Map type
 		 */
 		public String keyAttributeStr = "key#";
+		/**
+		 * type attribute label for meta Object field
+		 */
+		public String typeAttributeStr = "type#";
 	}
 }

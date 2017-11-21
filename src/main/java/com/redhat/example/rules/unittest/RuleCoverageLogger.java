@@ -94,6 +94,19 @@ public class RuleCoverageLogger extends DefaultAgendaEventListener {
 			kieBase = ((StatelessKieSession)session).getKieBase();
 		}
 		if (kieBase != null) {
+			for (org.kie.api.definition.process.Process process : kieBase.getProcesses()) {
+				Set<String> ruleGroups = new LinkedHashSet<String>();
+				for (Node node : ((RuleFlowProcess)process).getNodes()) {
+					if (node instanceof RuleSetNode) {
+						ruleGroups.add(((RuleSetNode)node).getRuleFlowGroup());
+					}
+				}
+				Set<String> previous = ruleFlowToRuleGroupMap.put(process.getId(), ruleGroups);
+				if (previous != null) {
+					// already registered (concurrent access)
+					ruleFlowToRuleGroupMap.put(process.getId(), previous);
+				}
+			}
 			for (KiePackage kiePackage : kieBase.getKiePackages()) {
 				initPackage(kiePackage);
 			}
@@ -128,19 +141,6 @@ public class RuleCoverageLogger extends DefaultAgendaEventListener {
 			return;
 		}
 		final RuleComparator ruleComparator = new RuleComparator();
-		for (org.kie.api.definition.process.Process process : kiePackage.getProcesses()) {
-			Set<String> ruleGroups = new LinkedHashSet<String>();
-			for (Node node : ((RuleFlowProcess)process).getNodes()) {
-				if (node instanceof RuleSetNode) {
-					ruleGroups.add(((RuleSetNode)node).getRuleFlowGroup());
-				}
-			}
-			Set<String> previous = ruleFlowToRuleGroupMap.put(process.getId(), ruleGroups);
-			if (previous != null) {
-				// already registered (concurrent access)
-				ruleFlowToRuleGroupMap.put(process.getId(), previous);
-			}
-		}
 		for (Rule rule : kiePackage.getRules()) {
 			Boolean previous = ruleCoverageMap.put(rule, Boolean.FALSE);
 			if (previous != null) {
