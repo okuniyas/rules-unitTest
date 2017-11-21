@@ -26,7 +26,6 @@ import org.kie.api.KieServices;
 import org.kie.api.command.Command;
 import org.kie.api.command.KieCommands;
 import org.kie.api.event.KieRuntimeEventManager;
-import org.kie.api.event.rule.RuleRuntimeEventManager;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
 import org.kie.api.runtime.StatelessKieSession;
@@ -67,8 +66,8 @@ public class TestCaseBase {
 		}
 	}
 	
-	protected void initSession(RuleRuntimeEventManager session) {
-		session.addEventListener(ruleCoverageLogger);
+	protected void initSession(KieRuntimeEventManager session) {
+		ruleCoverageLogger.setSession(session);
 		session.addEventListener(new RuleExecutionLogger());
 	}
 
@@ -115,7 +114,7 @@ public class TestCaseBase {
 		@Override
 		public void beforeExecute(KieRuntimeEventManager session) {
 			session.addEventListener(ruleExecLogger);
-			session.addEventListener(ruleCoverageLogger);
+			ruleCoverageLogger.setSession(session);
 		}
 
 		@Override
