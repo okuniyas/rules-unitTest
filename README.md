@@ -225,7 +225,7 @@ Above example represents there are three attributes `age, sex and message` and t
     - You can use `"id.key1"` and/or `"foo[0].attr1"` style as `columnName`.
 + `testPK` and `testSkip` are used for expected records.
     - `testPK` is the flag `Y, yes or true` as it's primary key attributes to match an actual fact and an expected record.
-        - This is defult that the order of the actual and the expect records are *NOT* same.
+        - This is default that the order of the actual and the expect records are *NOT* same.
         - You can change this by `checkByIndex=true` option. (see above)
     - `testSkip` is the flag `Y, yes or true` as it's ignored by `RuleFactWatchers` to trace changes.
 
