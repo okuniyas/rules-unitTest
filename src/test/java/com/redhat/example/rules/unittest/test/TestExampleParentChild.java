@@ -19,7 +19,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.kie.api.KieServices;
 import org.kie.api.command.Command;
-import org.kie.api.event.KieRuntimeEventManager;
 import org.kie.api.runtime.KieSession;
 import org.kie.api.runtime.StatelessKieSession;
 import org.kie.internal.command.CommandFactory;
@@ -29,7 +28,6 @@ import com.redhat.example.fact.ExampleFactParent;
 import com.redhat.example.fact.ExampleValidationResult;
 import com.redhat.example.json.JsonUtils;
 import com.redhat.example.rules.unittest.CsvTestHelper;
-import com.redhat.example.rules.unittest.RuleExecutionLogger;
 import com.redhat.example.rules.unittest.RuleFactWatcher;
 import com.redhat.example.rules.unittest.RuleFactWatchers;
 import com.redhat.example.rules.unittest.TestCaseBase;
@@ -45,10 +43,318 @@ public class TestExampleParentChild extends TestCaseBase {
 		ruleFlowName = null;
 	}
 	
-	private void set_test_tool(KieRuntimeEventManager kieSession) {
-		kieSession.addEventListener(new RuleExecutionLogger());
-		kieSession.addEventListener(ruleCoverageLogger);
+	/**
+	 * current version (2.X) style test code.
+	 */
+	@Test
+	public void test_with_csv_v2() {
+		Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();
+		// 入力データの準備
+		Map<String, List<?>> inputMap =
+				CsvTestHelper.loadInputMap("testdata/parentChild2/Files_1.csv");
+		@SuppressWarnings("unchecked")
+		List<ExampleFactParent> parentList =
+		(List<ExampleFactParent>) inputMap.get("parent");
+						
+		parameterMap.put("ExampleFactParent", parentList);
+
+		// 結果(個数不明)を入れるための空のリスト
+		LinkedList<ExampleValidationResult> results =
+				new LinkedList<ExampleValidationResult>();
+		parameterMap.put("ExampleValidationResult", results);
+						
+		// RuleFactWatchers の作成
+		RuleFactWatchers ruleFactWatchers =
+				CsvTestHelper.createRuleFactWatchers("testdata/parentChild2/Files_1.csv");
+			
+		// KieSession (pooling から取得)
+		KieServices ks = KieServices.Factory.get();
+		boolean stateful = false;
+		// ルール実行
+		if (stateful) {
+			KieSession kieSession = ks.getKieClasspathContainer().newKieSession();
+			initSession(kieSession);
+			// RuleFactWatcher の設定
+			ruleFactWatchers.setRuntime(kieSession);
+			if (!StringUtils.isEmpty(ruleFlowName))
+				kieSession.startProcess(ruleFlowName);
+			kieSession.insert(parameterMap);
+			kieSession.fireAllRules();
+			// RuleFactWatcher 後処理
+			ruleFactWatchers.resetRuntime();
+			kieSession.dispose();
+		} else {
+			StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
+			initSession(kieSession);
+			// RuleFactWatcher の設定
+			ruleFactWatchers.setRuntime(kieSession);
+			List<Command<?>> cmds = new ArrayList<Command<?>>();
+			if (!StringUtils.isEmpty(ruleFlowName))
+				cmds.add( CommandFactory.newStartProcess(ruleFlowName));
+			cmds.add( CommandFactory.newInsert(parameterMap));
+			kieSession.execute( CommandFactory.newBatchExecution( cmds ));
+		}
+
+		// 期待値との一致チェック（一括、配下の内部オブジェクトも含む）
+		CsvTestHelper.assertExpectCSVs(results,
+				"testdata/parentChild2/Files_1.csv",
+				"validationResult");
+		CsvTestHelper.assertExpectCSVs(parentList,
+				"testdata/parentChild2/Files_1.csv",
+				"parent");
 	}
+	
+	@Test
+	public void test_null_value_ignore() {
+		// 指定がない属性を上書きしない
+		List<ExampleFactChild> childs = CsvTestHelper.loadCsv(
+				"testdata/parentChild2/in_ChildFact_1.csv", ExampleFactChild.class, true);
+		// 1がロードされていること
+		assertThat(childs.get(0).getAttrBigDecimal(), is(BigDecimal.ONE));
+		assertThat(childs.get(1).getAttrBigDecimal(), is(BigDecimal.ONE));
+		// 指定がないため、初期値(0)のままであること
+		assertThat(childs.get(2).getAttrBigDecimal(), is(BigDecimal.ZERO));
+	}
+
+	@Test
+	public void test_Immutable_List() {
+		Map<String, List<?>> inputMap =
+				CsvTestHelper.loadInputMap("testdata/immutableList/Files_1.csv");
+		@SuppressWarnings("unchecked")
+		List<ExampleFactParent> parentList =
+		(List<ExampleFactParent>) inputMap.get("parent");
+
+		// List<String>
+		assertThat(parentList.get(0).getChildList().get(0).getStrList().get(0), new IsNull<String>());
+		assertThat(parentList.get(1).getChildList().get(0).getStrList().get(0), is(""));
+		assertThat(parentList.get(1).getChildList().get(1).getStrList().get(0), is("p2c2s1"));
+		assertThat(parentList.get(1).getChildList().get(1).getStrList().get(1), is("p2c2s2"));
+
+		// List<BigDecimal>
+		assertThat(parentList.get(0).getChildList().get(0).getBdList().get(0), is(new BigDecimal("111")));
+		assertThat(parentList.get(1).getChildList().get(0).getBdList().get(0), is(new BigDecimal("211")));
+		assertThat(parentList.get(1).getChildList().get(1).getBdList().get(0), new IsNull<BigDecimal>());
+		assertThat(parentList.get(1).getChildList().get(1).getBdList().get(1), is(new BigDecimal("222")));
+
+		// List<Date>
+		Calendar cal = Calendar.getInstance();
+		cal.clear();
+		cal.set(2016, 6 - 1, 30);
+		assertThat(parentList.get(0).getChildList().get(0).getDateList().get(0), is(cal.getTime()));
+		cal.add(Calendar.DAY_OF_MONTH, 1);
+		assertThat(parentList.get(1).getChildList().get(0).getDateList().get(0), is(cal.getTime()));
+		assertThat(parentList.get(1).getChildList().get(1).getDateList().get(0), new IsNull<Date>());
+		cal.add(Calendar.DAY_OF_MONTH, 1);
+		assertThat(parentList.get(1).getChildList().get(1).getDateList().get(1), is(cal.getTime()));
+
+		// List<Integer>
+		assertThat(parentList.get(0).getChildList().get(0).getIntList().get(0), is(new Integer("111")));
+		assertThat(parentList.get(1).getChildList().get(0).getIntList().get(0), is(new Integer("211")));
+		assertThat(parentList.get(1).getChildList().get(1).getIntList().get(0), new IsNull<Integer>());
+		assertThat(parentList.get(1).getChildList().get(1).getIntList().get(1), is(new Integer("222")));
+
+		// List<Double>
+		assertThat(parentList.get(0).getChildList().get(0).getDoubleList().get(0), is(new Double("111")));
+		assertThat(parentList.get(1).getChildList().get(0).getDoubleList().get(0), is(new Double("211")));
+		assertThat(parentList.get(1).getChildList().get(1).getDoubleList().get(0), new IsNull<Double>());
+		assertThat(parentList.get(1).getChildList().get(1).getDoubleList().get(1), is(new Double("222")));
+
+		// 
+		assertThat(parentList.get(0).getChildList().get(0).getAttrBigDecimal(), notNullValue());
+		assertThat(parentList.get(1).getChildList().get(0).getAttrBigDecimal(), notNullValue());
+		assertThat(parentList.get(1).getChildList().get(1).getAttrBigDecimal(), notNullValue());
+
+		Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();						
+		parameterMap.put("ExampleFactParent", parentList);
+		
+		// KieSession (pooling から取得)
+		KieServices ks = KieServices.Factory.get();
+		StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
+		initSession(kieSession);
+		// RuleFactWatcher の設定
+		CsvTestHelper.createRuleFactWatchers("testdata/immutableList/Files_1.csv").setRuntime(kieSession);
+		List<Command<?>> cmds = new ArrayList<Command<?>>();
+		if (!StringUtils.isEmpty(ruleFlowName))
+			cmds.add( CommandFactory.newStartProcess(ruleFlowName));
+		cmds.add( CommandFactory.newInsert(parameterMap));
+		kieSession.execute( CommandFactory.newBatchExecution( cmds ));
+		
+		CsvTestHelper.assertExpectCSVs(parentList, "testdata/immutableList/Files_1.csv",
+				"parent");
+
+		@SuppressWarnings("unchecked")
+		List<ExampleValidationResult> validationResultList =
+				(List<ExampleValidationResult>)parameterMap.get("ExampleValidationResult");
+		CsvTestHelper.assertExpectCSVs(validationResultList, "testdata/immutableList/Files_1.csv",
+				"validationResult");
+	}
+	
+	@Test
+	public void test_Map() {
+		Map<String, List<?>> inputMap =
+				CsvTestHelper.loadInputMap("testdata/map/Files_1.csv");
+		@SuppressWarnings("unchecked")
+		List<ExampleFactParent> parentList =
+		(List<ExampleFactParent>) inputMap.get("parent");
+
+		// List<String>
+		assertThat(parentList.get(0).getChildList().get(0).getMapAttr().get(111), is("str111"));
+		assertThat(parentList.get(1).getChildList().get(0).getMapAttr().get(222), is("str222"));
+		assertThat(parentList.get(1).getChildList().get(0).getMapAttr().get(333), is("str333"));
+		assertThat(parentList.get(1).getChildList().get(1).getMapAttr().size(), is(0));
+
+		Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();						
+		parameterMap.put("ExampleFactParent", parentList);
+		
+		// KieSession (pooling から取得)
+		KieServices ks = KieServices.Factory.get();
+		StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
+		initSession(kieSession);
+		// RuleFactWatcher の設定
+		CsvTestHelper.createRuleFactWatchers("testdata/map/Files_1.csv").setRuntime(kieSession);
+		List<Command<?>> cmds = new ArrayList<Command<?>>();
+		if (!StringUtils.isEmpty(ruleFlowName))
+			cmds.add( CommandFactory.newStartProcess(ruleFlowName));
+		cmds.add( CommandFactory.newInsert(parameterMap));
+		kieSession.execute( CommandFactory.newBatchExecution( cmds ));
+		
+		CsvTestHelper.assertExpectCSVs(parentList, "testdata/map/Files_1.csv",
+				"parent");
+
+		@SuppressWarnings("unchecked")
+		List<ExampleValidationResult> validationResultList =
+				(List<ExampleValidationResult>)parameterMap.get("ExampleValidationResult");
+		CsvTestHelper.assertExpectCSVs(validationResultList, "testdata/map/Files_1.csv",
+				"validationResult");
+	}
+
+	@Test
+	public void test_checkByIndex() {
+		Map<String, List<?>> inputMap =
+				CsvTestHelper.loadInputMap("testdata/checkByIndex/Files_1.csv");
+		@SuppressWarnings("unchecked")
+		List<ExampleFactParent> parentList =
+		(List<ExampleFactParent>) inputMap.get("parent");
+
+		// List<String>
+		assertThat(parentList.get(0).getChildList().get(0).getStrList().get(0), new IsNull<String>());
+		assertThat(parentList.get(1).getChildList().get(0).getStrList().get(0), is(""));
+		assertThat(parentList.get(1).getChildList().get(1).getStrList().get(0), is("p2c2s1"));
+		assertThat(parentList.get(1).getChildList().get(1).getStrList().get(1), is("p2c2s2"));
+
+		// List<BigDecimal>
+		assertThat(parentList.get(0).getChildList().get(0).getBdList().get(0), is(new BigDecimal("111")));
+		assertThat(parentList.get(1).getChildList().get(0).getBdList().get(0), is(new BigDecimal("211")));
+		assertThat(parentList.get(1).getChildList().get(1).getBdList().get(0), new IsNull<BigDecimal>());
+		assertThat(parentList.get(1).getChildList().get(1).getBdList().get(1), is(new BigDecimal("222")));
+
+		// List<Date>
+		Calendar cal = Calendar.getInstance();
+		cal.clear();
+		cal.set(2016, 6 - 1, 30);
+		assertThat(parentList.get(0).getChildList().get(0).getDateList().get(0), is(cal.getTime()));
+		cal.add(Calendar.DAY_OF_MONTH, 1);
+		assertThat(parentList.get(1).getChildList().get(0).getDateList().get(0), is(cal.getTime()));
+		assertThat(parentList.get(1).getChildList().get(1).getDateList().get(0), new IsNull<Date>());
+		cal.add(Calendar.DAY_OF_MONTH, 1);
+		assertThat(parentList.get(1).getChildList().get(1).getDateList().get(1), is(cal.getTime()));
+
+		// List<Integer>
+		assertThat(parentList.get(0).getChildList().get(0).getIntList().get(0), is(new Integer("111")));
+		assertThat(parentList.get(1).getChildList().get(0).getIntList().get(0), is(new Integer("211")));
+		assertThat(parentList.get(1).getChildList().get(1).getIntList().get(0), new IsNull<Integer>());
+		assertThat(parentList.get(1).getChildList().get(1).getIntList().get(1), is(new Integer("222")));
+
+		// List<Double>
+		assertThat(parentList.get(0).getChildList().get(0).getDoubleList().get(0), is(new Double("111")));
+		assertThat(parentList.get(1).getChildList().get(0).getDoubleList().get(0), is(new Double("211")));
+		assertThat(parentList.get(1).getChildList().get(1).getDoubleList().get(0), new IsNull<Double>());
+		assertThat(parentList.get(1).getChildList().get(1).getDoubleList().get(1), is(new Double("222")));
+
+		// 
+		assertThat(parentList.get(0).getChildList().get(0).getAttrBigDecimal(), notNullValue());
+		assertThat(parentList.get(1).getChildList().get(0).getAttrBigDecimal(), notNullValue());
+		assertThat(parentList.get(1).getChildList().get(1).getAttrBigDecimal(), notNullValue());
+
+		Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();						
+		parameterMap.put("ExampleFactParent", parentList);
+		
+		// KieSession (pooling から取得)
+		KieServices ks = KieServices.Factory.get();
+		StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
+		initSession(kieSession);
+		// RuleFactWatcher の設定
+		CsvTestHelper.createRuleFactWatchers("testdata/checkByIndex/Files_1.csv").setRuntime(kieSession);
+		List<Command<?>> cmds = new ArrayList<Command<?>>();
+		if (!StringUtils.isEmpty(ruleFlowName))
+			cmds.add( CommandFactory.newStartProcess(ruleFlowName));
+		cmds.add( CommandFactory.newInsert(parameterMap));
+		kieSession.execute( CommandFactory.newBatchExecution( cmds ));
+		
+		CsvTestHelper.assertExpectCSVs(parentList, "testdata/checkByIndex/Files_1.csv",
+				"parent");
+
+		@SuppressWarnings("unchecked")
+		List<ExampleValidationResult> validationResultList =
+				(List<ExampleValidationResult>)parameterMap.get("ExampleValidationResult");
+		CsvTestHelper.assertExpectCSVs(validationResultList, "testdata/checkByIndex/Files_1.csv",
+				"validationResult");
+	}
+	
+    @Test
+    public void test_with_kadai3() {
+        Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();
+        // 入力データの準備
+        Map<String, List<?>> inputMap =
+                CsvTestHelper.loadInputMap("testdata/kadai3/Files_1.csv");
+        @SuppressWarnings("unchecked")
+        List<ExampleFactParent> parentList =
+        (List<ExampleFactParent>) inputMap.get("parent");
+                        
+        parameterMap.put("ExampleFactParent", parentList);
+
+        // 結果(個数不明)を入れるための空のリスト
+        LinkedList<ExampleValidationResult> results =
+                new LinkedList<ExampleValidationResult>();
+        parameterMap.put("ExampleValidationResult", results);
+                        
+        // RuleFactWatchers の作成
+        RuleFactWatchers ruleFactWatchers =
+                CsvTestHelper.createRuleFactWatchers("testdata/kadai3/Files_1.csv");
+            
+        // KieSession (pooling から取得)
+        KieServices ks = KieServices.Factory.get();
+        boolean stateful = false;
+        // ルール実行
+        if (stateful) {
+            KieSession kieSession = ks.getKieClasspathContainer().newKieSession();
+            initSession(kieSession);
+            // RuleFactWatcher の設定
+            ruleFactWatchers.setRuntime(kieSession);
+            if (!StringUtils.isEmpty(ruleFlowName))
+                kieSession.startProcess(ruleFlowName);
+            kieSession.insert(parameterMap);
+            kieSession.fireAllRules();
+            // RuleFactWatcher 後処理
+            ruleFactWatchers.resetRuntime();
+            kieSession.dispose();
+        } else {
+            StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
+            initSession(kieSession);
+            // RuleFactWatcher の設定
+            ruleFactWatchers.setRuntime(kieSession);
+            List<Command<?>> cmds = new ArrayList<Command<?>>();
+            if (!StringUtils.isEmpty(ruleFlowName))
+                cmds.add( CommandFactory.newStartProcess(ruleFlowName));
+            cmds.add( CommandFactory.newInsert(parameterMap));
+            kieSession.execute( CommandFactory.newBatchExecution( cmds ));
+        }
+
+        // 期待値との一致チェック（一括、配下の内部オブジェクトも含む）
+        CsvTestHelper.assertExpectCSVs(parentList,
+                "testdata/kadai3/Files_1.csv",
+                "parent");
+    }
 
 	@SuppressWarnings("unchecked")
 	@Test
@@ -120,7 +426,7 @@ public class TestExampleParentChild extends TestCaseBase {
 			// デシリアライズしたfactMapでルールエンジン実行
 			KieServices ks = KieServices.Factory.get();
 			kieSession = ks.getKieClasspathContainer().newKieSession();
-			set_test_tool(kieSession);
+			initSession(kieSession);
 			if (! StringUtils.isEmpty(ruleFlowName))
 				kieSession.startProcess(ruleFlowName);
 			kieSession.insert(factMapRestored);
@@ -222,7 +528,7 @@ public class TestExampleParentChild extends TestCaseBase {
 		// ルール実行
 		if (stateful) {
 			KieSession kieSession = ks.getKieClasspathContainer().newKieSession();
-			set_test_tool(kieSession);
+			initSession(kieSession);
 			// RuleFactWatcher の設定
 			ruleFactWatcher_ExampleValidationResult.setRuntime(kieSession);
 			ruleFactWatcher_ExampleFactChild_1.setRuntime(kieSession);
@@ -238,7 +544,7 @@ public class TestExampleParentChild extends TestCaseBase {
 			kieSession.dispose();
 		} else {
 			StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
-			set_test_tool(kieSession);
+			initSession(kieSession);
 			// RuleFactWatcher の設定
 			ruleFactWatcher_ExampleValidationResult.setRuntime(kieSession);
 			ruleFactWatcher_ExampleFactChild_1.setRuntime(kieSession);
@@ -266,317 +572,4 @@ public class TestExampleParentChild extends TestCaseBase {
 				"testdata/parentChild/ex_ExampleFactChild_1-2.csv", false);
 	}
 	
-	/**
-	 * current version (2.X) style test code.
-	 */
-	@Test
-	public void test_with_csv_v2() {
-		Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();
-		// 入力データの準備
-		Map<String, List<?>> inputMap =
-				CsvTestHelper.loadInputMap("testdata/parentChild2/Files_1.csv");
-		@SuppressWarnings("unchecked")
-		List<ExampleFactParent> parentList =
-		(List<ExampleFactParent>) inputMap.get("parent");
-						
-		parameterMap.put("ExampleFactParent", parentList);
-
-		// 結果(個数不明)を入れるための空のリスト
-		LinkedList<ExampleValidationResult> results =
-				new LinkedList<ExampleValidationResult>();
-		parameterMap.put("ExampleValidationResult", results);
-						
-		// RuleFactWatchers の作成
-		RuleFactWatchers ruleFactWatchers =
-				CsvTestHelper.createRuleFactWatchers("testdata/parentChild2/Files_1.csv");
-			
-		// KieSession (pooling から取得)
-		KieServices ks = KieServices.Factory.get();
-		boolean stateful = false;
-		// ルール実行
-		if (stateful) {
-			KieSession kieSession = ks.getKieClasspathContainer().newKieSession();
-			set_test_tool(kieSession);
-			// RuleFactWatcher の設定
-			ruleFactWatchers.setRuntime(kieSession);
-			if (!StringUtils.isEmpty(ruleFlowName))
-				kieSession.startProcess(ruleFlowName);
-			kieSession.insert(parameterMap);
-			kieSession.fireAllRules();
-			// RuleFactWatcher 後処理
-			ruleFactWatchers.resetRuntime();
-			kieSession.dispose();
-		} else {
-			StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
-			set_test_tool(kieSession);
-			// RuleFactWatcher の設定
-			ruleFactWatchers.setRuntime(kieSession);
-			List<Command<?>> cmds = new ArrayList<Command<?>>();
-			if (!StringUtils.isEmpty(ruleFlowName))
-				cmds.add( CommandFactory.newStartProcess(ruleFlowName));
-			cmds.add( CommandFactory.newInsert(parameterMap));
-			kieSession.execute( CommandFactory.newBatchExecution( cmds ));
-		}
-
-		// 期待値との一致チェック（一括、配下の内部オブジェクトも含む）
-		CsvTestHelper.assertExpectCSVs(results,
-				"testdata/parentChild2/Files_1.csv",
-				"validationResult");
-		CsvTestHelper.assertExpectCSVs(parentList,
-				"testdata/parentChild2/Files_1.csv",
-				"parent");
-	}
-	
-	@Test
-	public void test_null_value_ignore() {
-		// 指定がない属性を上書きしない
-		List<ExampleFactChild> childs = CsvTestHelper.loadCsv(
-				"testdata/parentChild2/in_ChildFact_1.csv", ExampleFactChild.class, true);
-		// 1がロードされていること
-		assertThat(childs.get(0).getAttrBigDecimal(), is(BigDecimal.ONE));
-		assertThat(childs.get(1).getAttrBigDecimal(), is(BigDecimal.ONE));
-		// 指定がないため、初期値(0)のままであること
-		assertThat(childs.get(2).getAttrBigDecimal(), is(BigDecimal.ZERO));
-	}
-
-	@Test
-	public void test_Immutable_List() {
-		Map<String, List<?>> inputMap =
-				CsvTestHelper.loadInputMap("testdata/immutableList/Files_1.csv");
-		@SuppressWarnings("unchecked")
-		List<ExampleFactParent> parentList =
-		(List<ExampleFactParent>) inputMap.get("parent");
-
-		// List<String>
-		assertThat(parentList.get(0).getChildList().get(0).getStrList().get(0), new IsNull<String>());
-		assertThat(parentList.get(1).getChildList().get(0).getStrList().get(0), is(""));
-		assertThat(parentList.get(1).getChildList().get(1).getStrList().get(0), is("p2c2s1"));
-		assertThat(parentList.get(1).getChildList().get(1).getStrList().get(1), is("p2c2s2"));
-
-		// List<BigDecimal>
-		assertThat(parentList.get(0).getChildList().get(0).getBdList().get(0), is(new BigDecimal("111")));
-		assertThat(parentList.get(1).getChildList().get(0).getBdList().get(0), is(new BigDecimal("211")));
-		assertThat(parentList.get(1).getChildList().get(1).getBdList().get(0), new IsNull<BigDecimal>());
-		assertThat(parentList.get(1).getChildList().get(1).getBdList().get(1), is(new BigDecimal("222")));
-
-		// List<Date>
-		Calendar cal = Calendar.getInstance();
-		cal.clear();
-		cal.set(2016, 6 - 1, 30);
-		assertThat(parentList.get(0).getChildList().get(0).getDateList().get(0), is(cal.getTime()));
-		cal.add(Calendar.DAY_OF_MONTH, 1);
-		assertThat(parentList.get(1).getChildList().get(0).getDateList().get(0), is(cal.getTime()));
-		assertThat(parentList.get(1).getChildList().get(1).getDateList().get(0), new IsNull<Date>());
-		cal.add(Calendar.DAY_OF_MONTH, 1);
-		assertThat(parentList.get(1).getChildList().get(1).getDateList().get(1), is(cal.getTime()));
-
-		// List<Integer>
-		assertThat(parentList.get(0).getChildList().get(0).getIntList().get(0), is(new Integer("111")));
-		assertThat(parentList.get(1).getChildList().get(0).getIntList().get(0), is(new Integer("211")));
-		assertThat(parentList.get(1).getChildList().get(1).getIntList().get(0), new IsNull<Integer>());
-		assertThat(parentList.get(1).getChildList().get(1).getIntList().get(1), is(new Integer("222")));
-
-		// List<Double>
-		assertThat(parentList.get(0).getChildList().get(0).getDoubleList().get(0), is(new Double("111")));
-		assertThat(parentList.get(1).getChildList().get(0).getDoubleList().get(0), is(new Double("211")));
-		assertThat(parentList.get(1).getChildList().get(1).getDoubleList().get(0), new IsNull<Double>());
-		assertThat(parentList.get(1).getChildList().get(1).getDoubleList().get(1), is(new Double("222")));
-
-		// 
-		assertThat(parentList.get(0).getChildList().get(0).getAttrBigDecimal(), notNullValue());
-		assertThat(parentList.get(1).getChildList().get(0).getAttrBigDecimal(), notNullValue());
-		assertThat(parentList.get(1).getChildList().get(1).getAttrBigDecimal(), notNullValue());
-
-		Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();						
-		parameterMap.put("ExampleFactParent", parentList);
-		
-		// KieSession (pooling から取得)
-		KieServices ks = KieServices.Factory.get();
-		StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
-		set_test_tool(kieSession);
-		// RuleFactWatcher の設定
-		CsvTestHelper.createRuleFactWatchers("testdata/immutableList/Files_1.csv").setRuntime(kieSession);
-		List<Command<?>> cmds = new ArrayList<Command<?>>();
-		if (!StringUtils.isEmpty(ruleFlowName))
-			cmds.add( CommandFactory.newStartProcess(ruleFlowName));
-		cmds.add( CommandFactory.newInsert(parameterMap));
-		kieSession.execute( CommandFactory.newBatchExecution( cmds ));
-		
-		CsvTestHelper.assertExpectCSVs(parentList, "testdata/immutableList/Files_1.csv",
-				"parent");
-
-		@SuppressWarnings("unchecked")
-		List<ExampleValidationResult> validationResultList =
-				(List<ExampleValidationResult>)parameterMap.get("ExampleValidationResult");
-		CsvTestHelper.assertExpectCSVs(validationResultList, "testdata/immutableList/Files_1.csv",
-				"validationResult");
-	}
-	
-	@Test
-	public void test_Map() {
-		Map<String, List<?>> inputMap =
-				CsvTestHelper.loadInputMap("testdata/map/Files_1.csv");
-		@SuppressWarnings("unchecked")
-		List<ExampleFactParent> parentList =
-		(List<ExampleFactParent>) inputMap.get("parent");
-
-		// List<String>
-		assertThat(parentList.get(0).getChildList().get(0).getMapAttr().get(111), is("str111"));
-		assertThat(parentList.get(1).getChildList().get(0).getMapAttr().get(222), is("str222"));
-		assertThat(parentList.get(1).getChildList().get(0).getMapAttr().get(333), is("str333"));
-		assertThat(parentList.get(1).getChildList().get(1).getMapAttr().size(), is(0));
-
-		Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();						
-		parameterMap.put("ExampleFactParent", parentList);
-		
-		// KieSession (pooling から取得)
-		KieServices ks = KieServices.Factory.get();
-		StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
-		set_test_tool(kieSession);
-		// RuleFactWatcher の設定
-		CsvTestHelper.createRuleFactWatchers("testdata/map/Files_1.csv").setRuntime(kieSession);
-		List<Command<?>> cmds = new ArrayList<Command<?>>();
-		if (!StringUtils.isEmpty(ruleFlowName))
-			cmds.add( CommandFactory.newStartProcess(ruleFlowName));
-		cmds.add( CommandFactory.newInsert(parameterMap));
-		kieSession.execute( CommandFactory.newBatchExecution( cmds ));
-		
-		CsvTestHelper.assertExpectCSVs(parentList, "testdata/map/Files_1.csv",
-				"parent");
-
-		@SuppressWarnings("unchecked")
-		List<ExampleValidationResult> validationResultList =
-				(List<ExampleValidationResult>)parameterMap.get("ExampleValidationResult");
-		CsvTestHelper.assertExpectCSVs(validationResultList, "testdata/map/Files_1.csv",
-				"validationResult");
-}
-
-	@Test
-	public void test_checkByIndex() {
-		Map<String, List<?>> inputMap =
-				CsvTestHelper.loadInputMap("testdata/checkByIndex/Files_1.csv");
-		@SuppressWarnings("unchecked")
-		List<ExampleFactParent> parentList =
-		(List<ExampleFactParent>) inputMap.get("parent");
-
-		// List<String>
-		assertThat(parentList.get(0).getChildList().get(0).getStrList().get(0), new IsNull<String>());
-		assertThat(parentList.get(1).getChildList().get(0).getStrList().get(0), is(""));
-		assertThat(parentList.get(1).getChildList().get(1).getStrList().get(0), is("p2c2s1"));
-		assertThat(parentList.get(1).getChildList().get(1).getStrList().get(1), is("p2c2s2"));
-
-		// List<BigDecimal>
-		assertThat(parentList.get(0).getChildList().get(0).getBdList().get(0), is(new BigDecimal("111")));
-		assertThat(parentList.get(1).getChildList().get(0).getBdList().get(0), is(new BigDecimal("211")));
-		assertThat(parentList.get(1).getChildList().get(1).getBdList().get(0), new IsNull<BigDecimal>());
-		assertThat(parentList.get(1).getChildList().get(1).getBdList().get(1), is(new BigDecimal("222")));
-
-		// List<Date>
-		Calendar cal = Calendar.getInstance();
-		cal.clear();
-		cal.set(2016, 6 - 1, 30);
-		assertThat(parentList.get(0).getChildList().get(0).getDateList().get(0), is(cal.getTime()));
-		cal.add(Calendar.DAY_OF_MONTH, 1);
-		assertThat(parentList.get(1).getChildList().get(0).getDateList().get(0), is(cal.getTime()));
-		assertThat(parentList.get(1).getChildList().get(1).getDateList().get(0), new IsNull<Date>());
-		cal.add(Calendar.DAY_OF_MONTH, 1);
-		assertThat(parentList.get(1).getChildList().get(1).getDateList().get(1), is(cal.getTime()));
-
-		// List<Integer>
-		assertThat(parentList.get(0).getChildList().get(0).getIntList().get(0), is(new Integer("111")));
-		assertThat(parentList.get(1).getChildList().get(0).getIntList().get(0), is(new Integer("211")));
-		assertThat(parentList.get(1).getChildList().get(1).getIntList().get(0), new IsNull<Integer>());
-		assertThat(parentList.get(1).getChildList().get(1).getIntList().get(1), is(new Integer("222")));
-
-		// List<Double>
-		assertThat(parentList.get(0).getChildList().get(0).getDoubleList().get(0), is(new Double("111")));
-		assertThat(parentList.get(1).getChildList().get(0).getDoubleList().get(0), is(new Double("211")));
-		assertThat(parentList.get(1).getChildList().get(1).getDoubleList().get(0), new IsNull<Double>());
-		assertThat(parentList.get(1).getChildList().get(1).getDoubleList().get(1), is(new Double("222")));
-
-		// 
-		assertThat(parentList.get(0).getChildList().get(0).getAttrBigDecimal(), notNullValue());
-		assertThat(parentList.get(1).getChildList().get(0).getAttrBigDecimal(), notNullValue());
-		assertThat(parentList.get(1).getChildList().get(1).getAttrBigDecimal(), notNullValue());
-
-		Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();						
-		parameterMap.put("ExampleFactParent", parentList);
-		
-		// KieSession (pooling から取得)
-		KieServices ks = KieServices.Factory.get();
-		StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
-		set_test_tool(kieSession);
-		// RuleFactWatcher の設定
-		CsvTestHelper.createRuleFactWatchers("testdata/checkByIndex/Files_1.csv").setRuntime(kieSession);
-		List<Command<?>> cmds = new ArrayList<Command<?>>();
-		if (!StringUtils.isEmpty(ruleFlowName))
-			cmds.add( CommandFactory.newStartProcess(ruleFlowName));
-		cmds.add( CommandFactory.newInsert(parameterMap));
-		kieSession.execute( CommandFactory.newBatchExecution( cmds ));
-		
-		CsvTestHelper.assertExpectCSVs(parentList, "testdata/checkByIndex/Files_1.csv",
-				"parent");
-
-		@SuppressWarnings("unchecked")
-		List<ExampleValidationResult> validationResultList =
-				(List<ExampleValidationResult>)parameterMap.get("ExampleValidationResult");
-		CsvTestHelper.assertExpectCSVs(validationResultList, "testdata/checkByIndex/Files_1.csv",
-				"validationResult");
-	}
-	
-    @Test
-    public void test_with_kadai3() {
-        Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();
-        // 入力データの準備
-        Map<String, List<?>> inputMap =
-                CsvTestHelper.loadInputMap("testdata/kadai3/Files_1.csv");
-        @SuppressWarnings("unchecked")
-        List<ExampleFactParent> parentList =
-        (List<ExampleFactParent>) inputMap.get("parent");
-                        
-        parameterMap.put("ExampleFactParent", parentList);
-
-        // 結果(個数不明)を入れるための空のリスト
-        LinkedList<ExampleValidationResult> results =
-                new LinkedList<ExampleValidationResult>();
-        parameterMap.put("ExampleValidationResult", results);
-                        
-        // RuleFactWatchers の作成
-        RuleFactWatchers ruleFactWatchers =
-                CsvTestHelper.createRuleFactWatchers("testdata/kadai3/Files_1.csv");
-            
-        // KieSession (pooling から取得)
-        KieServices ks = KieServices.Factory.get();
-        boolean stateful = false;
-        // ルール実行
-        if (stateful) {
-            KieSession kieSession = ks.getKieClasspathContainer().newKieSession();
-            set_test_tool(kieSession);
-            // RuleFactWatcher の設定
-            ruleFactWatchers.setRuntime(kieSession);
-            if (!StringUtils.isEmpty(ruleFlowName))
-                kieSession.startProcess(ruleFlowName);
-            kieSession.insert(parameterMap);
-            kieSession.fireAllRules();
-            // RuleFactWatcher 後処理
-            ruleFactWatchers.resetRuntime();
-            kieSession.dispose();
-        } else {
-            StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
-            set_test_tool(kieSession);
-            // RuleFactWatcher の設定
-            ruleFactWatchers.setRuntime(kieSession);
-            List<Command<?>> cmds = new ArrayList<Command<?>>();
-            if (!StringUtils.isEmpty(ruleFlowName))
-                cmds.add( CommandFactory.newStartProcess(ruleFlowName));
-            cmds.add( CommandFactory.newInsert(parameterMap));
-            kieSession.execute( CommandFactory.newBatchExecution( cmds ));
-        }
-
-        // 期待値との一致チェック（一括、配下の内部オブジェクトも含む）
-        CsvTestHelper.assertExpectCSVs(parentList,
-                "testdata/kadai3/Files_1.csv",
-                "parent");
-    }
-
 }
