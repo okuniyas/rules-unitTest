@@ -1,0 +1,3 @@
+parent#,key#,value,type#
+1,ベーススコア_住宅ローン,3,java.math.BigDecimal
+1,行動スコア_住宅ローン,2,java.math.BigDecimal

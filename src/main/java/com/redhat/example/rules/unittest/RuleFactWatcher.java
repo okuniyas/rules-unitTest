@@ -61,6 +61,8 @@ public class RuleFactWatcher {
 	public static final ConstantValues Constants = new ConstantValues();
 
 	List<ExpectedRecord> expectedRecords;
+	Class<?> clazz;
+	Class<?> keyClass;
 	boolean checkByIndex;
 	BiPredicate<ExpectedRecord, Object> predicate;
 	Map<String, Boolean> testSkipMap;
@@ -75,6 +77,8 @@ public class RuleFactWatcher {
 	 * if you use CSV files to specify expected values, please use {@link CsvTestHelper#createRuleFactWatcher(String, Class, String) CsvTestHelper.createRuleFact()} method.<BR>
 	 * <BR>
 	 * @param expectedRecords expected record information
+	 * @param clazz class of expected values
+	 * @param keyClass class of key if values are in a Map, null if values are not in a Map
 	 * @param checkByIndex the flag to check actuals and expected values by same index
 	 * @param predicate predicate to check equality of between target fact and expected record
 	 * @param testSkipMap map of flags for each attributes to skip the watching.
@@ -82,10 +86,14 @@ public class RuleFactWatcher {
 	 */
 	public RuleFactWatcher(
 			List<ExpectedRecord> expectedRecords,
+			Class<?> clazz,
+			Class<?> keyClass,
 			boolean checkByIndex,
 			BiPredicate<ExpectedRecord, Object> predicate,
 			Map<String, Boolean> testSkipMap) {
 		this.expectedRecords = expectedRecords;
+		this.clazz = clazz;
+		this.keyClass = keyClass;
 		this.checkByIndex = checkByIndex;
 		this.predicate = predicate;
 		this.testSkipMap = testSkipMap;
@@ -227,7 +235,7 @@ public class RuleFactWatcher {
 					} else if (workExpectedRecords.get(actualIndex - 1).fact != null) {
 						Object expect = workExpectedRecords.get(actualIndex - 1).fact;
 						logger.debug("** expeced record ({}) {}[{}] of the actual record [{}] is null at rule ({})",
-								expect, expect.getClass().getSimpleName(),
+								expect, clazz.getSimpleName(),
 								actualIndex - 1,
 								actualIndex - 1,
 								ruleName);
@@ -262,24 +270,23 @@ public class RuleFactWatcher {
 						expectedValue = getProperty(expect.fact, key);
 					}
 				}
+				String keyValue = "";
 				String attrName = key;
-				String className = actual.getClass().getSimpleName();
+				String className = clazz.getSimpleName();
 				String changeStr = null;
 				if (toBeChecked) {
 					if (actual instanceof MapEntry) {
 						if (attrName.startsWith(Constants.keyAttributeStr)) {
 							Object o = ((MapEntry)actual).key;
-							className = o.getClass().getSimpleName();
+							className = keyClass.getSimpleName();
 							id = System.identityHashCode(o);
 							attrName = "";
 						} else {
+							keyValue = ((MapEntry)actual).key.toString();
 							Object o = ((MapEntry)actual).value;
-							className = o.getClass().getSimpleName();
+							className = clazz.getSimpleName();
 							id = System.identityHashCode(o);
-							if (attrName.equals(Constants.valueAttributeStr) &&
-									isImmutable(o.getClass())) {
-								attrName = "";
-							}
+							attrName = "";
 						}
 					} else {
 						if (attrName.equals(Constants.valueAttributeStr) &&
@@ -292,11 +299,11 @@ public class RuleFactWatcher {
 						registerValue(actual, attrName, actualValue);
 					} else if (timing == Timing.AFTER) {
 						changeStr = getChangeString(actual, attrName, actualValue);
-						printAnAttribute(ruleName, className, id, attrName, changeStr, actualValue, expectedValue);
+						printAnAttribute(ruleName, className, id, attrName, changeStr, actualValue, expectedValue, keyValue);
 					} else { // (timing == Timing.INSERT)
 						registerValue(actual, attrName, Constants.unknownValueLavel);
 						changeStr = getChangeString(actual, attrName, actualValue);
-						printAnAttribute(ruleName, className, id, attrName, changeStr, actualValue, expectedValue);
+						printAnAttribute(ruleName, className, id, attrName, changeStr, actualValue, expectedValue, keyValue);
 					}
 				}
 			}
@@ -310,7 +317,11 @@ public class RuleFactWatcher {
 			Object map = null;
 			// as the hash value of the obj was changed, so need to search
 			for (Map.Entry<Object, Map<String, Object>> entry : previousValues.entrySet()) {
-				if (entry.getKey() == obj) {
+				if (keyClass != null) {
+					if (((MapEntry)entry.getKey()).key.equals(((MapEntry)obj).key)) {
+						map = (Object)entry.getValue();
+					}
+				} else if (entry.getKey() == obj) {
 					map = (Object)entry.getValue();
 				}
 			}
@@ -318,7 +329,7 @@ public class RuleFactWatcher {
 		}
 		if (valuesMap == null) {
 			// no previous value
-			return null;
+			return "(" + Constants.unknownValueLavel + ") => (" + currentValue + ")";			
 		}
 		Object pre = valuesMap.remove(attrName);
 		if (pre == null) {
@@ -345,7 +356,11 @@ public class RuleFactWatcher {
 			Object map = null;
 			// as the hash value of the obj was changed, so need to search
 			for (Map.Entry<Object, Map<String, Object>> entry : previousValues.entrySet()) {
-				if (entry.getKey() == obj) {
+				if (keyClass != null) {
+					if (((MapEntry)entry.getKey()).key.equals(((MapEntry)obj).key)) {
+						map = (Object)entry.getValue();
+					}
+				} else if (entry.getKey() == obj) {
 					map = (Object)entry.getValue();
 				}
 			}
@@ -362,7 +377,7 @@ public class RuleFactWatcher {
 	}
 
 	private void printAnAttribute(String ruleName, String className, int id, String attrName,
-			String changeStr, Object actualValue, Object expectedValue) {
+			String changeStr, Object actualValue, Object expectedValue, String keyValue) {
 		boolean asExpected = false;
 		if (actualValue == null) {
 			if (expectedValue == null)
@@ -371,14 +386,16 @@ public class RuleFactWatcher {
 			asExpected = actualValue.equals(expectedValue);
 		}
 		if (changeStr != null) {
-			logger.debug("** {}@{}{} was CHANGED [{}]{} at rule ({})",
+			logger.debug("** {}{}@{}{} was CHANGED [{}]{} at rule ({})",
+					keyValue.length() == 0 ? "" : ("key='" + keyValue + "' value "),
 					className, id,
 					(StringUtils.isEmpty(attrName) ? "" : "#" + attrName),
 					changeStr,
 					(asExpected ? " as Expected" : ""),
 					ruleName);
 		} else {
-			logger.debug("** {}@{}{} was NOT changed ({}){} at rule ({})",
+			logger.debug("** {}{}@{}{} was NOT changed ({}){} at rule ({})",
+					keyValue.length() == 0 ? "" : ("key='" + keyValue + "' value "),
 					className, id,
 					(StringUtils.isEmpty(attrName) ? "" : "#" + attrName),
 					actualValue,
@@ -386,7 +403,8 @@ public class RuleFactWatcher {
 					ruleName);
 		}
 		if (!asExpected) {
-			logger.debug(" * {}@{}#{} is Expected ({}) But is ({})",
+			logger.debug(" * {}{}@{}#{} is Expected ({}) But is ({})",
+					keyValue.length() == 0 ? "" : ("key='" + keyValue + "' value "),
 					className, id,
 					(StringUtils.isEmpty(attrName) ? "" : "#" + attrName),
 					expectedValue,
@@ -410,6 +428,9 @@ public class RuleFactWatcher {
 				return ((MapEntry)obj).key;
 			}
 			obj = ((MapEntry)obj).value;
+			if (obj == null) {
+				return null;
+			}
 		}
 		if (isImmutable(obj.getClass()) &&
 				Constants.valueAttributeStr.equals(key)) {

@@ -184,22 +184,18 @@ public class CsvTestHelper {
 	 * @return list of column definitions.
 	 */
 	private static List<CsvColumnDef> readColumnDef(String fileName, String className) {
+		File path = new File(fileName);
 		String[] fileMappng = { "columnName", "option", "format", "testPK", "testSkip" };
 		CellProcessor[] processors = new CellProcessor[] { new NotNull(), new Optional(), new Optional(), new Optional(), new Optional() };
 		List<CsvColumnDef> ret = null;
 		try {
-			String def_file = getDefFile(fileName, className).getCanonicalPath();
-			ret = loadCsv(def_file, CsvColumnDef.class, fileMappng, false, processors);
+			ret = loadCsv(new File(path.getParentFile(), className + DEFINITION_FILE_EXT).getCanonicalPath(),
+					CsvColumnDef.class, fileMappng, false, processors);
 		} catch (IOException e) {
 			e.printStackTrace();
 			fail("fail at access: " + className + DEFINITION_FILE_EXT);
 		}
 		return ret;
-	}
-
-	private static File getDefFile(String fileName, String className) throws IOException {
-		File path = new File(fileName);
-		return new File(path.getParentFile(), className + DEFINITION_FILE_EXT);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -298,6 +294,9 @@ public class CsvTestHelper {
 	}
 
 	private static Object getImmutableObject(Class<?> clazz, String strV) {
+		if (strV == null) {
+			return null;
+		}
 		if (clazz.equals(BigDecimal.class)) {
 			return new BigDecimal(strV);
 		} else if (clazz.equals(BigInteger.class)) {
@@ -476,7 +475,7 @@ public class CsvTestHelper {
 		}
 		return ret;
 	}
-		
+	
 	/**
 	 * Check as actual result of facts has expected values<BR>
 	 * only checks specified expected values of specified attributes of specified facts.<BR>
@@ -484,24 +483,12 @@ public class CsvTestHelper {
 	 * <BR>
 	 * @param actuals a list of actual result facts
 	 * @param filename the file name which contains expected values
-	 * @see CsvTestHelper#assertExpectCSV(List, String, boolean)
-	 */
-	@Deprecated
-	public static Integer[] assertExpectCSV(List<?> actuals, String filename) {
-		return assertExpectCSVwithParentRow(actuals, filename, false, null);
-	}
-
-	/**
-	 * Check as actual result of facts has expected values<BR>
-	 * only checks specified expected values of specified attributes of specified facts.<BR>
-	 * you can specify expected values into important attributes of important facts.<BR>
-	 * <BR>
-	 * @param actuals a list of actual result facts
-	 * @param filename the file name which contains expected values
+	 * @param clazz the class of actuals
+	 * @param keyClass the key class if actuals are in a Map. it's null if actuals are not in a Map.
 	 * @param checkByIndex the flag to check actuals and expected values by same index
 	 */
-	public static Integer[] assertExpectCSV(List<?> actuals, String filename, boolean checkByIndex) {
-		return assertExpectCSVwithParentRow(actuals, filename, checkByIndex, null);
+	public static Integer[] assertExpectCSV(List<?> actuals, String filename, Class<?> clazz, Class<?> keyClass, boolean checkByIndex) {
+		return assertExpectCSVwithParentRow(actuals, filename, clazz, keyClass, checkByIndex, null);
 	}
 
 	private static Map<String, Boolean> createTestSkipMap(List<CsvColumnDef> columnDefs) {
@@ -517,18 +504,18 @@ public class CsvTestHelper {
 	 * create BiPredicate to check equality of an actual fact and an expected record fact.
 	 * @param columnDefs column definition list
 	 * @param clazz FACT class
+	 * @param keyClass the key class if FACTs are in a Map as values, null if FACTs are not in a Map
 	 * @return BiPredicate to check equality of an actual fact and an expected record fact.
 	 */
 	private static BiPredicate<ExpectedRecord, Object>
-	createTestPredicate(List<CsvColumnDef> columnDefs, Class<?> clazz) {
+	createTestPredicate(List<CsvColumnDef> columnDefs, Class<?> clazz, Class<?> keyClass) {
 		BiPredicate<ExpectedRecord, Object> predicate =
 				new BiPredicate<ExpectedRecord, Object>() {
 
 			@Override
 			public boolean test(ExpectedRecord expected, Object fact) {
-				if (fact.getClass().equals(MapEntry.class)) {
-					// do nothing
-				} else if (!fact.getClass().isAssignableFrom(clazz)) {
+				boolean isMap = keyClass != null;
+				if (!isMap && !fact.getClass().isAssignableFrom(clazz)) {
 					return false;
 				}
 				boolean ret = true;
@@ -591,9 +578,9 @@ public class CsvTestHelper {
 	public static RuleFactWatcher createRuleFactWatcher(String filename, Class<?> clazz, boolean checkByIndex, Class<?> keyClass) {
 		List<CsvColumnDef> columnDefs = CsvTestHelper.readColumnDef(filename, clazz.getSimpleName());
 		List<ExpectedRecord> expectedRecords = CsvTestHelper.readExpectedCsv(filename, clazz, keyClass);
-		BiPredicate<ExpectedRecord, Object> predicate = CsvTestHelper.createTestPredicate(columnDefs, clazz);
+		BiPredicate<ExpectedRecord, Object> predicate = CsvTestHelper.createTestPredicate(columnDefs, clazz, keyClass);
 		Map<String, Boolean> testSkipMap = CsvTestHelper.createTestSkipMap(columnDefs);
-		return new RuleFactWatcher(expectedRecords, checkByIndex, predicate, testSkipMap);
+		return new RuleFactWatcher(expectedRecords, clazz, keyClass, checkByIndex, predicate, testSkipMap);
 	}
 
 	/**
@@ -823,45 +810,26 @@ public class CsvTestHelper {
 	 * Check the actual list with the expected list which are filtered by the parentRow info
 	 * @param actuals a list of actual result facts
 	 * @param filename the file name which contains expected values
+	 * @param clazz the class of actuals
+	 * @param keyClass the key class if actuals are in a Map. it's null if actuals are not in a Map.
 	 * @param checkByIndex the flag to check actuals and expected values by same index
 	 * @param parentRow parent row to filter this child list
 	 * @return mapping array with actualIndex and expectIndex
 	 * @see CsvTestHelper#assertExpectCSV(List, String, boolean)
 	 */
 	public static <T> Integer[] assertExpectCSVwithParentRow(List<T> actuals,
-			String filename, boolean checkByIndex, String parentRow) {
+			String filename, Class<?> clazz, Class<?> keyClass, boolean checkByIndex, String parentRow) {
 		Integer[] ret = new Integer[actuals != null ? actuals.size() : 0];
-		// get Class from actuals
-		boolean isMap = false;
-		Class<?> clazz = null;
-		Class<?> keyClass = null;
+		int countActuals = 0;
 		if (actuals != null) {
-			for (int i=0; i<actuals.size(); i++) {
-				T o = actuals.get(i);
-				if (o != null) {
-					clazz = o.getClass();
-					// if clazz is MapEntry, get the class of the value
-					if (clazz.equals(MapEntry.class)) {
-						isMap = true;
-						Object v = ((MapEntry)o).value;
-						Object k = ((MapEntry)o).key;
-						if (v != null) {
-							clazz = v.getClass();
-						} else {
-							clazz = null;
-						}
-						if (k != null) {
-							keyClass = k.getClass();
-						}
-						if (clazz != null && keyClass != null)
-							break;
-					}
+			for (Object act : actuals) {
+				if (act != null) {
+					countActuals++;
 				}
 			}
 		}
-		
 		// in case of no actuals, or all actuals are null
-		if (clazz == null) {
+		if (countActuals == 0) {
 			// check if there are expected records
 			int countExpectedRecords = 0;
 			for (Map<String, Object> map : readCsvIntoMaps(filename, false)) {
@@ -896,16 +864,12 @@ public class CsvTestHelper {
 						
 		List<CsvColumnDef> columnDefs = null;
 		try {
-			File defFile = getDefFile(filename, clazz.getSimpleName());
-			if (! defFile.exists()) {
-				clazz = Object.class;
-			}
 			columnDefs = readColumnDef(filename, clazz.getSimpleName());
 		} catch (Exception e1) {
 			e1.printStackTrace();
 			fail("fail at readColumnDef(" + filename + ", " + clazz.getSimpleName() + ")");
 		}
-		BiPredicate<ExpectedRecord, Object> predicate = createTestPredicate(columnDefs, clazz);
+		BiPredicate<ExpectedRecord, Object> predicate = createTestPredicate(columnDefs, clazz, keyClass);
 		Map<String, Boolean> testSkipMap = createTestSkipMap(columnDefs);
 		String factClassName = clazz.getSimpleName();
 			
@@ -957,7 +921,7 @@ public class CsvTestHelper {
 						expect.used = true;
 						// update the mapping array of actualIndex and expectIndex;
 						ret[actualIndex - 1] = expectIndex - 1;
-						checkAttributes(actual, actualIndex, expect, isMap, testSkipMap);
+						checkAttributes(actual, actualIndex, expect, clazz, keyClass, testSkipMap);
 					}
 				}
 				if (foundExpect == false) {
@@ -1017,25 +981,32 @@ public class CsvTestHelper {
 	}
 
 	private static void checkAttributes(Object actual, int actualIndex, ExpectedRecord expect,
-			boolean isMap, Map<String, Boolean> testSkipMap) {
+			Class<?> clazz, Class<?> keyClass, Map<String, Boolean> testSkipMap) {
 		Object expectedFact = expect.fact;
+		boolean isMap = keyClass != null;
 		for (Map.Entry<String, Object> entry : expect.map.entrySet()) {
 			// filter out attributes both of PARENT_ROW and Test Skip keys.
 			if (entry.getKey().indexOf("#") == -1 && !testSkipMap.get(entry.getKey())) {
 				String key = entry.getKey();
 				Object value = entry.getValue();
+				// check if the equality between the expected value and the fact's attribute value
+				Object actualObj = (!isMap) ? actual : ((MapEntry)actual).value;
+				Object expectObj = (!isMap) ? expectedFact : ((MapEntry)expectedFact).value;
 				if (RuleFactWatcher.Constants.nullCheckStr.equals(value)) {
-					logger.debug("**assertExpectCSV** Checking actual record {}[{}]@{}",
-							actual.getClass().getSimpleName(), actualIndex - 1,
-							System.identityHashCode(actual));
 					// check if it is null as the expected value is "should be null" value
-					assertThat(actual, hasProperty(key, is(nullValue())));
+					logger.debug("**assertExpectCSV** Checking actual {} {}[{}]@{}",
+							(isMap) ? ("key:'" + ((MapEntry)actual).key + "' value") : "record",
+							clazz.getSimpleName(), actualIndex - 1,
+							System.identityHashCode(actual));
+					if (!isMap) {
+						assertThat(actual, hasProperty(key, is(nullValue())));
+					} else {
+						assertThat(actualObj, is(nullValue()));
+					}
 				} else if (!StringUtils.isEmpty((String)value)) {
-					// check if the equality between the expected value and the fact's attribute value
-					Object actualObj = (!isMap) ? actual : ((MapEntry)actual).value;
-					Object expectObj = (!isMap) ? expectedFact : ((MapEntry)expectedFact).value;
-					logger.debug("**assertExpectCSV** Checking actual record {}[{}]@{}",
-							actualObj.getClass().getSimpleName(), actualIndex - 1,
+					logger.debug("**assertExpectCSV** Checking actual {} {}[{}]@{}",
+							(isMap) ? ("key:'" + ((MapEntry)actual).key + "' value") : "record",
+							clazz.getSimpleName(), actualIndex - 1,
 							System.identityHashCode(actualObj));
 					if (key.contains(".") || key.contains("[")) {
 						// get the target attribute value
@@ -1334,6 +1305,25 @@ public class CsvTestHelper {
 			String path[] = separateParentPath(csvFile.path);
 			List<Object> parentActuals = actualsMap.get(path[0]);
 			Integer[] parentIndexArray = indexMap.get(path[0]);
+			
+			Class<?> clazz = null;
+			try {
+				clazz = Class.forName(csvFile.clazz);
+			} catch (ClassNotFoundException e1) {
+				e1.printStackTrace();
+				fail("fail in assertExpectCSVs()");
+			}
+			Map<String, String> optionMap = getOptionMap(csvFile.options);
+			boolean checkByIndex = "true".equalsIgnoreCase(optionMap.get(OPTION_CHECK_BY_INDEX));
+			String keyType = optionMap.get(OPTION_KEY_TYPE);
+			Class<?> keyClass = null;
+			try {
+				keyClass = (keyType != null) ? Class.forName(keyType) : null;
+			} catch (ClassNotFoundException e1) {
+				e1.printStackTrace();
+				fail("fail in assertExpectCSVs()");
+			}
+
 			if (parentActuals == null) {
 				// check actual records at the top level
 				String expectedFile = null;
@@ -1344,11 +1334,8 @@ public class CsvTestHelper {
 					fail("fail to access: " + csvFile.file);
 				}
 				
-				boolean checkByIndex = "true".equalsIgnoreCase(
-						getOptionMap(csvFile.options).get(OPTION_CHECK_BY_INDEX));
-
 				logger.debug("**assertExpectCSV** Checking path:" + csvFile.path);
-				Integer[] indexArray = assertExpectCSV(actuals, expectedFile, checkByIndex);
+				Integer[] indexArray = assertExpectCSV(actuals, expectedFile, clazz, keyClass, checkByIndex);
 				
 				// register for the next level
 				actualsMap.put(pathPrefix, (List<Object>)actuals);
@@ -1388,9 +1375,6 @@ public class CsvTestHelper {
 						fail("fail to access: " + csvFile.file);
 					}
 					
-					boolean checkByIndex = "true".equalsIgnoreCase(
-							getOptionMap(csvFile.options).get(OPTION_CHECK_BY_INDEX));
-
 					// check child
 					String parentRow = isNeedParentRow ? ("" + (parentIndexArray[i]+1)) : null;
 					logger.debug("**assertExpectCSV** Checking path:" + csvFile.path + ", "
@@ -1398,7 +1382,7 @@ public class CsvTestHelper {
 							);
 					Integer indexArray[] =
 							assertExpectCSVwithParentRow(internalActuals,
-									childExpectedFile, checkByIndex, parentRow);
+									childExpectedFile, clazz, keyClass, checkByIndex, parentRow);
 					
 					// register internal actuals for the next level
 					List<Object> registeredList = (List<Object>)actualsMap.get(csvFile.path);

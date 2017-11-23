@@ -26,6 +26,7 @@ import org.kie.internal.command.CommandFactory;
 import com.redhat.example.fact.ExampleFactChild;
 import com.redhat.example.fact.ExampleFactParent;
 import com.redhat.example.fact.ExampleValidationResult;
+import com.redhat.example.fact.plan.CustomerProfileAll;
 import com.redhat.example.json.JsonUtils;
 import com.redhat.example.rules.unittest.CsvTestHelper;
 import com.redhat.example.rules.unittest.RuleFactWatcher;
@@ -356,7 +357,45 @@ public class TestExampleParentChild extends TestCaseBase {
                 "parent");
     }
 
-	@SuppressWarnings("unchecked")
+    
+    @Test
+    public void test_Map2() {
+        // 入力データの準備
+        Map<String, List<?>> inputMap =
+                CsvTestHelper.loadInputMap("testdata/map2/Files_1.csv");
+        @SuppressWarnings("unchecked")
+        List<CustomerProfileAll> profileList =
+        (List<CustomerProfileAll>) inputMap.get("profile");
+        
+        Map<String, Object> parameterMap = new LinkedHashMap<String, Object>();
+        parameterMap.put("CustomerProfileAll", profileList);
+        
+        assertThat(profileList.size(), is(1));
+
+        Map<String, Object> map = profileList.get(0).getMap();
+        assertThat(map, hasEntry("顧客ID", "A00101"));
+        assertThat(map, hasEntry("家族人数", new BigDecimal("1")));
+        assertThat(map, hasEntry("ヌル", null));
+        assertThat(map, hasEntry("空文字", ""));
+
+        // RuleFactWatchers の作成
+        RuleFactWatchers ruleFactWatchers =
+                CsvTestHelper.createRuleFactWatchers("testdata/map2/Files_1.csv");
+        
+        StatelessKieSession kieSession = ks.getKieClasspathContainer().newStatelessKieSession();
+        initSession(kieSession);
+        // RuleFactWatcher の設定
+        ruleFactWatchers.setRuntime(kieSession);
+        List<Command<?>> cmds = new ArrayList<Command<?>>();
+        if (!StringUtils.isEmpty(ruleFlowName))
+            cmds.add( CommandFactory.newStartProcess(ruleFlowName));
+        cmds.add( CommandFactory.newInsert(parameterMap));
+        kieSession.execute( CommandFactory.newBatchExecution( cmds ));
+
+        CsvTestHelper.assertExpectCSVs(profileList, "testdata/map2/Files_1.csv", "profile");
+    }
+    
+    	@SuppressWarnings("unchecked")
 	@Test
 	public void json_serialize_test() {
 		// 入力データの準備
@@ -565,11 +604,10 @@ public class TestExampleParentChild extends TestCaseBase {
 				"testdata/parentChild/out_ExampleFactChild_1-2.csv");
 		// 期待値との一致チェック
 		CsvTestHelper.assertExpectCSV(results,
-				"testdata/parentChild/ex_ExampleValidationResult_1.csv", false);
+				"testdata/parentChild/ex_ExampleValidationResult_1.csv", ExampleValidationResult.class, null, false);
 		CsvTestHelper.assertExpectCSV(childList_1,
-				"testdata/parentChild/ex_ExampleFactChild_1-1.csv", false);
+				"testdata/parentChild/ex_ExampleFactChild_1-1.csv", ExampleFactChild.class, null, false);
 		CsvTestHelper.assertExpectCSV(childList_2,
-				"testdata/parentChild/ex_ExampleFactChild_1-2.csv", false);
+				"testdata/parentChild/ex_ExampleFactChild_1-2.csv", ExampleFactChild.class, null, false);
 	}
-	
 }

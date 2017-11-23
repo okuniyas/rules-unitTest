@@ -1,0 +1,13 @@
+type,file,clazz,path,parentAtr,options
+IN,in_CustomerProfileAll_1.csv,com.redhat.example.fact.plan.CustomerProfileAll,profile,,
+IN,in_CustomerProfileAllMap_1.csv,java.lang.Object,profile.map,,keyType=java.lang.String
+IN,in_CustomerProfileTarget_1.csv,com.redhat.example.fact.plan.CustomerProfileTarget,target,,
+IN,in_CustomerProfileTargetMap_1.csv,java.lang.Object,target.map,,keyType=java.lang.String
+IN,in_FactInfo_1.csv,com.redhat.example.fact.plan.FactInfo,factinfo,,
+IN,in_FactInfoZokuseiMap_1.csv,java.lang.Object,factinfo.ëÆê´Map,,keyType=java.lang.String
+IN,in_InstrumentsScore_1.csv,com.redhat.example.fact.plan.InstrumentsScore,score,,
+IN,in_InstrumentsScoreMap_1.csv,java.lang.Object,score.map,,keyType=java.lang.String
+EX,ex_CustomerProfileAll_1.csv,com.redhat.example.fact.plan.CustomerProfileAll,profile,,
+EX,ex_CustomerProfileAllMap_1.csv,java.lang.Object,profile.map,,keyType=java.lang.String
+EX,ex_CustomerProfileTarget_1.csv,com.redhat.example.fact.plan.CustomerProfileTarget,target,,
+EX,ex_CustomerProfileTargetMap_1.csv,java.lang.Object,target.map,,keyType=java.lang.String

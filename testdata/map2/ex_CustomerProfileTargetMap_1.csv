@@ -1,0 +1,6 @@
+parent#,key#,value,type#
+1,家族人数,2,java.math.BigDecimal
+1,年齢,30,java.math.BigDecimal
+1,融資_住宅ローン契約,0,java.math.BigDecimal
+1,預金残高,5000,java.math.BigDecimal
+1,ライフイベント結婚,1,java.lang.String
